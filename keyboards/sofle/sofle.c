@@ -48,14 +48,15 @@ const uint8_t PROGMEM encoder_hand_swap_config[NUM_ENCODERS] = {1, 0};
 #endif
 
 #ifdef OLED_ENABLE
+
 oled_rotation_t oled_init_kb(oled_rotation_t rotation) {
     if (is_keyboard_master()) {
-        return OLED_ROTATION_270;
+        return OLED_ROTATION_0;
     }
     return rotation;
 }
 
-static void render_logo(void) {
+void render_logo(void) {
     static const char PROGMEM qmk_logo[] = {
         0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8a,0x8b,0x8c,0x8d,0x8e,0x8f,0x90,0x91,0x92,0x93,0x94,
         0xa0,0xa1,0xa2,0xa3,0xa4,0xa5,0xa6,0xa7,0xa8,0xa9,0xaa,0xab,0xac,0xad,0xae,0xaf,0xb0,0xb1,0xb2,0xb3,0xb4,
@@ -64,41 +65,48 @@ static void render_logo(void) {
     oled_write_P(qmk_logo, false);
 }
 
+void set_pixel(uint8_t x, uint8_t y, bool on) {
+    uint16_t index = (y / 8) * OLED_DISPLAY_WIDTH + x;
+    uint8_t bit = 1 << (y % 8);
+    if (on) {
+        oled_write_raw_byte(bit, index);
+    }
+}
+
 void print_status_narrow(void) {
-    oled_write_P(PSTR("\n\n"), false);
-    switch (get_highest_layer(layer_state)) {
-        case 0:
-            oled_write_ln_P(PSTR("Qwrt"), false);
-            break;
-        case 1:
-            oled_write_ln_P(PSTR("Clmk"), false);
-            break;
-        default:
-            oled_write_P(PSTR("Mod\n"), false);
-            break;
-    }
-    oled_write_P(PSTR("\n\n"), false);
-    oled_write_ln_P(PSTR("LAYER"), false);
+    oled_clear();  // Start mit leerem Display
+    
     switch (get_highest_layer(layer_state)) {
         case 0:
         case 1:
-            oled_write_P(PSTR("Base\n"), false);
-            break;
         case 2:
-            oled_write_P(PSTR("Lower"), false);
-            break;
         case 3:
-            oled_write_P(PSTR("Raise"), false);
+            // Schwarzer Bildschirm (bereits durch oled_clear())
             break;
+            
         case 4:
-            oled_write_P(PSTR("Adjust"), false);
+            // Zeichne von oben links nach unten rechts
+            for (uint8_t i = 0; i < 32; i++) {
+                uint8_t x = (i * 128) / 32;
+                set_pixel(x, i, true);
+                // Mache die Linie dicker
+                if (x > 0) set_pixel(x-1, i, true);
+                if (x < 127) set_pixel(x+1, i, true);
+            }
+            
+            // Zeichne von oben rechts nach unten links
+            for (uint8_t i = 0; i < 32; i++) {
+                uint8_t x = 127 - ((i * 128) / 32);
+                set_pixel(x, i, true);
+                // Mache die Linie dicker
+                if (x > 0) set_pixel(x-1, i, true);
+                if (x < 127) set_pixel(x+1, i, true);
+            }
             break;
+            
         default:
-            oled_write_ln_P(PSTR("Undef"), false);
+            break;
     }
-    oled_write_P(PSTR("\n\n"), false);
-    led_t led_usb_state = host_keyboard_led_state();
-    oled_write_ln_P(PSTR("CPSLK"), led_usb_state.caps_lock);
 }
 
 bool oled_task_kb(void) {
@@ -112,7 +120,6 @@ bool oled_task_kb(void) {
     }
     return true;
 }
-
 #endif
 
 #ifdef ENCODER_ENABLE
